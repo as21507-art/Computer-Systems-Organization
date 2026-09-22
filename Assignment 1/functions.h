@@ -9,183 +9,288 @@
  Date Created: 2026-09-18
  */
 
-// Helper function that converts the 32 bit IEEE 754 representation of 0
-// Input: float_string pointer that stores the 32 bit IEEE 754 representation
-// Ouptut: Void
-void zero_case(char **float_string)
-{
+/* Helper Functions */
 
-    // Floating-point value: 00000000000000000000000000000000
+// Function: Creates and populates the string with all 0 entries
+// Input: a reference to the string representing the floating point representation
+// Ouput: None
+char *zero_case()
+{
+    // Allocating memory for the string
+    char *zero_string = malloc(33);
+
+    // Populating the string with all zeros
     for (int i = 0; i < 32; i++)
     {
-        (*float_string)[i] = '0';
+        zero_string[i] = '0';
     }
+
+    // Adding the string terminator
+    zero_string[32] = '\0';
+
+    return zero_string;
 }
 
-// Helper function that initializes the sign of the number
-// Input: value pointer that stores the value to be checked, float_string pointer that stores the the 32 bit IEEE 754 representation and sign pointer
-void sign_checker(float *value, char **float_string, short *sign)
+// Function: Converts the expoenent into the string
+void norm_exponent(int exponent, char **float_string)
 {
 
-    // MSB 0 to represent positive
-    if (*value < 0)
-    {
-        (*float_string)[0] = '0';
-        *sign = 1;
-    }
+    // Index of the string
+    int i = 8;
 
-    // MSB 1 to represent negative
-    else
-    {
-        (*float_string)[0] = '1';
-        *sign = -1;
-    }
-}
-
-// Helper function to normalize a given number
-// Input: a value
-void normalizer(float *value, int *exponent)
-{
-
-    // Converting the value to normalized form 1.xxx * 2^y
-    // Values with magnitude 1 or greater
-    if (*value >= 1 || *value <= -1)
+    // Converting the exponent to binary
+    while (i != 0)
     {
 
-        // Reduce any integral part strictly greater than 1
-        while (*value >= 2 || *value <= -2)
+        if (exponent % 2 == 0)
         {
-            *value = *value / 2;
-            (*exponent)++;
+            *float_string[i] = '0';
         }
-    }
-
-    // Values with magitude less than 1
-    else
-    {
-
-        // Increase to create an integral part at least 1
-        while (*value < 1 || *value > -1)
-        {
-            *value = *value * 2;
-            (*exponent)--;
-        }
-    }
-}
-
-// Helper function that constructs the significand from the given fractional part
-// Input: pointer to the fractional part, the string storing the 32 bit IEEE 754 floating-point representation and sign
-// Output: a boolean that is true if the mantissa is all zeros, and false otherwise
-bool significand_converter(float *value, char **float_string, short *sign)
-{
-
-    // Boolean to check if the significand was all zeros
-    bool all_zeros = true;
-
-    // Iterating through the number to determine the significand
-    for (int i = 9; i < 32; i++)
-    {
-
-        *value = *value * 2;
-
-        // Corresponds to a 1 in floating-point representation
-        if (*value >= 1)
-        {
-            *value = *value - *sign;
-            (*float_string)[i] = '1';
-            all_zeros = false;
-        }
-
-        // Corresponds to a 0 in floating-point representation
         else
         {
-            (*float_string)[i] = '0';
+            *float_string[i] = '1';
         }
-    }
 
-    return all_zeros;
+        // Updating indices and exponent for next iteratios
+        exponent = exponent / 2;
+        i--;
+    }
 }
 
-// Helper function to convert the exponent to binary
-
-// Ouput: a boolean that is true if the biased exponenet is between 1 and 254 inclusive
-bool convert_exponent(char **float_string, int *exponent)
+// Functions: Handles the conversion of infinities
+char *inf_case(bool positive)
 {
 
-    // Normalized form case
-    if (*exponent < 255 && *exponent > 0)
-    {
+    // Allocating memory for the string
+    char *float_string = malloc(33);
 
-        // Converting biased exponenet directly to binary
-        for (int i = 7; i > 0; i--)
+    // Adding the sign bit
+    if (positive)
+    {
+        float_string[0] = '0';
+    }
+    else
+    {
+        float_string[0] = '1';
+    }
+
+    // Representing the expoenent
+    for (int i = 1; i < 9; i++)
+    {
+        float_string[i] = '1';
+    }
+
+    // Representing the significand
+    for (int i = 9; i < 32; i++)
+    {
+        float_string[i] = '0';
+    }
+
+    // Adding the string terminator
+    float_string[32] = '\0';
+
+    return float_string;
+}
+
+// Function: Handles the denormalized case
+char *denorm_case(float *value, bool positive)
+{
+    // Allocating memory for the string
+    char *float_string = malloc(33);
+
+    // Determining the most significant bit
+    if (positive)
+    {
+        float_string[0] = '1';
+    }
+    else
+    {
+        float_string[0] = '0';
+    }
+
+    // Constructing the expoenent
+    for (int i = 1; i < 9; i++)
+    {
+        float_string[i] = '0';
+    }
+
+    // Constructing the significand
+    for (int i = 9; i < 32; i++)
+    {
+        if (*value >= 1.0)
         {
-            if (*exponent % 2 == 0)
-                (*float_string)[i] = '0';
-            else
-                (*float_string)[i] = '1';
-            *exponent = *exponent / 2;
+            float_string[i] = '1';
+            *value = *value - 1;
+        }
+        else
+        {
+            float_string[i] = '0';
+        }
+        *value = *value * 2;
+    }
+
+    // Adding the string terminator
+    float_string[32] = '\0';
+
+    return float_string;
+}
+
+// Function: Handles the conversion of positive number to floating point representation
+
+char *positive_case(float *value)
+{
+    // Converting to positive infinity
+    if (*value == INFINITY)
+    {
+        return inf_case(true);
+    }
+
+    // Initializing the biased exponent
+    unsigned int biased_exponent = 127;
+
+    // Normalizing values less than 1
+    if (*value < 1.0)
+    {
+        while (*value < 1.0)
+        {
+            *value = *value * 2;
+            biased_exponent--;
+            if (biased_exponent == 0)
+            {
+                return denorm_case(&value);
+            }
         }
     }
 
-    // Denormalized form case
-    else
+    // Normalizing values more than 1
+    else if (*value >= 2.0)
     {
+        while (*value >= 2.0)
+        {
+            *value = *value / 2;
+            biased_exponent++;
+        }
     }
+
+    // Following representation is for normalized numbers
+
+    // Allocating memory for the string
+    char *float_string = malloc(33);
+
+    // Adding the sign bit
+    float_string[0] = '0';
+
+    // Convert the expoenent directly into string
+    norm_exponent(biased_exponent, &float_string);
+
+    // Ignore the leading 1
+    *value = *value - 1;
+
+    // Converting the significand
+    for (int i = 9; i < 32; i++)
+    {
+        *value = *value * 2;
+        if (*value >= 1.0)
+        {
+            float_string[i] = '1';
+            *value = *value - 1;
+        }
+        else
+        {
+            float_string[i] = '0';
+        }
+    }
+
+    return float_string;
 }
+
+// Function: Handles the conversion of positive number to floating point representation
+
+char *negative_case(float *value)
+{
+
+    // Converting to negative infinity
+    if (*value == -INFINITY)
+    {
+        return inf_case(false);
+    }
+
+    // Initializing the biased exponent
+    unsigned int biased_exponent = 127;
+
+    // Normalizing values less than 1
+    if (*value > -1.0)
+    {
+        while (*value > -1.0)
+        {
+            *value = *value * 2;
+            biased_exponent--;
+            if (biased_exponent == 0)
+            {
+                return denorm_case();
+            }
+        }
+    }
+
+    // Normalizing values more than 1
+    else if (*value <= -2.0)
+    {
+        while (*value <= -2.0)
+        {
+            *value = *value / 2;
+            biased_exponent++;
+        }
+    }
+
+    // Following representation is for normalized numbers
+
+    // Allocating memory for the string
+    char *float_string = malloc(33);
+
+    // Adding the sign bit
+    float_string[0] = '1';
+
+    // Convert the expoenent directly into string
+    norm_exponent(biased_exponent, &float_string);
+
+    // Ignore the leading 1
+    *value = *value + 1;
+
+    // Converting the significand
+    for (int i = 9; i < 32; i++)
+    {
+        *value = *value * 2;
+        if (*value <= -1.0)
+        {
+            float_string[i] = '1';
+            *value = *value + 1;
+        }
+        else
+        {
+            float_string[i] = '0';
+        }
+    }
+
+    return float_string;
+}
+
+/* Task 1 */
 
 // Function: Takes a floating-point number in decimal and converts it into the IEEE 754 floating-point representation using 32 bits
 // Input: Takes a float value in base 10
 // Outputs: A character pointer (string) representing the 32 bit floating-point number in IEEE 754 representation
 char *float_to_binary(float value)
 {
-
-    // Initializing the character pointer to store the answer and allocating 32 + 1 bits
-    char *float_string;
-    float_string = malloc(33);
-
-    // Initializing the string terminator
-    float_string[32] = '\0';
-
     // Checking special edge #1 (value = 0)
     if (value == 0.0)
-        zero_case(&float_string);
-
+        return zero_case();
     else
     {
-
-        // Determining the sign of the floating-point number
-        // sign: Stores 1 for positive number and -1 for negative number
-        short sign;
-        sign_checker(&value, &float_string, &sign);
-
-        // Cases for extremely small numbers
-        if (value < pow(2, -126) || value > -pow(2, -126))
-        {
-        }
-
-        // General cases where the number is greater than
+        // Determining the sign of the number
+        if (value > 0.0)
+            return positive_case(&value);
         else
-        {
-
-            // Initializing the biased exponent
-            int exponent = 127;
-
-            // Normalizing the value to the form 1.xxx * 2^y
-            normalizer(&value, &exponent);
-
-            // Ignore the leading 1 in 1.xxx * 2^y
-            value = value - sign;
-
-            // Converting the exponent
-            if (convert_exponent(&float_string, &exponent))
-            {
-
-                // Converting the significand if the exponenet is not in special case
-                significand_converter(&value, &float_string, &sign);
-            }
-        }
-
-        return float_string;
+            return negative_case(&value);
     }
 }
 
@@ -200,10 +305,178 @@ char *switch_significand_exponent(char *value)
     // Allocating memory for the new string
     char *new_value = malloc(33);
 
-    // Copying the most significant bit (MSB) to the new string
+    // Copying the most significant bit (MSB) to the new value
     new_value[0] = value[0];
 
-    // Copyin
+    // Copying the significand to the new value
+    for (int i = 1; i < 24; i++)
+    {
+        new_value[i] = value[i + 8];
+    }
+
+    // Copying the exponent to the new value
+    for (int i = 1; i < 9; i++)
+    {
+        new_value[i + 23] = value[i];
+    }
+
+    // Adding the string terminator
+    new_value[32] = '/0';
 
     return new_value;
+}
+
+/* Task 3 */
+
+// Function: Inverts the positions of MSB, exponent, significand to significand, expoenent, MSB
+// Input: char* storing the string representation of the 32 bit IEEE 754 floating point representation
+// Ouput: char* storing the string represetnation of the 32 bit IEEE 754 floating point representation
+char *invert_bit_string(char *value)
+{
+
+    // Allocating memory for the new string
+    char *new_value = malloc(33);
+
+    // Copying the most significant bit (MSB) to the new value
+    new_value[31] = value[0];
+
+    // Copying the significand to the new value
+    for (int i = 0; i < 23; i++)
+    {
+        new_value[i] = value[i + 9];
+    }
+
+    // Copying the exponent to the new value
+    for (int i = 1; i < 9; i++)
+    {
+        new_value[i + 22] = value[i];
+    }
+
+    // Adding the string terminator
+    new_value[32] = '/0';
+
+    return new_value;
+}
+
+/* Task: 4 */
+
+// Function: Converts value from float to unsigned int
+unsigned int converter(float *value)
+{
+
+    // Convert the value to string
+    char *temp = float_to_binary(*value);
+
+    // Convert the string to unsigned int
+    unsigned int converted_value;
+
+    // Copying the string representation to unsigned int
+    for (int i = 0; i < 32; i++)
+    {
+        converted_value = converted_value * 2;
+        if (temp[i] == '1')
+        {
+            converted_value++;
+        }
+    }
+
+    return converted_value;
+}
+
+// Function: Extracts the sign bit from a floating point number using bit manipulation
+// Input: float storing the value
+// Output: unsigned int storing the sign of the flaoting point number
+unsigned int get_sign(float value)
+{
+    // Initialize the floating value as unsigned integer to perform bitwise operations
+    unsigned int new_value = converter(&value);
+
+    // Perform the logical operations to remove the expoenent and significand
+    new_value = new_value >> 31;
+
+    // Undo the operation to restore the position of the sign bit
+    new_value = new_value << 31;
+
+    return new_value;
+}
+
+/* Task: 5 */
+
+// Function: Extracts the expoenent from a given floating point number using bit manipulation
+// Input: float storing the value
+// Output: unsigned int storing the biased exponent
+unsigned int get_exponent(float value)
+{
+    // Initialize the floating value as unsigned integer to perform bitwise operations
+    unsigned int new_value = converter(&value);
+
+    // Perform the logical operations to remove the sign bit
+    new_value = new_value << 1;
+
+    // Perform another operation to remove the significand
+    new_value = new_value >> 24;
+
+    return new_value;
+}
+
+/* Task: 6 */
+
+// Function: Extracts the significand from a given floating point number using bit manipulation
+// Input: float storing the value
+// Output: unsigned int storing the significand
+unsigned int get_significand(float value)
+{
+    // Initialize the floating value as unsigned integer to perform bitwise operations
+    unsigned int new_value = converter(&value);
+
+    // Perform the logical operations to remove the sign bit and the exponent
+    new_value = new_value << 9;
+
+    // Undo the operation to restore the position of the significand
+    new_value = new_value >> 9;
+
+    return new_value;
+}
+
+/* Task: 7 */
+
+// Function: Switches the position of the significand and the exponent using bit manipulation
+// Input: float storing the value
+// Output: unsigned int storing the value with the expoenents and significand switched
+unsigned int switch_significand_exponent(float value)
+{
+    // Initialize the sign, exponent and significand as unsigned integers to perform bitwise operations
+    unsigned int sign = get_sign(value);
+    unsigned int exponent = get_exponent(value);
+    unsigned int significand = get_significand(value);
+
+    // Change the position of the significand
+    significand << 8;
+
+    // Perform the and operation to get the swapped value
+    return (significand & exponent) & sign;
+}
+
+/* Task : 8 */
+
+// Function: Flips the sign of the floating point number using bit manipulation
+// Input: float storing the value
+// Ouput: unsigned int storing the value with the sign bit flipped
+unsigned int flip_sign(float value)
+{
+    // Initialize the floating value as unsigned integer to perform bitwise operations
+    unsigned int new_value = converter(&value);
+    unsigned int sign = get_sign(value);
+
+    // Only the sign is inverted by XOR
+    return sign ^ new_value;
+}
+
+/* Task 9: */
+
+// Function: Reduces a given floating point representation from 32 bits to 16 bits
+// Input: unsigned int storing the float representation in 32 bits
+// Output: unsigned short storing the float representation in 16 bits
+unsigned short reduce_F32_to_F16(unsigned int value)
+{
 }
