@@ -157,7 +157,7 @@ char *positive_case(float value)
             biased_exponent--;
             if (biased_exponent == 0)
             {
-                return denorm_case(value);
+                return denorm_case(value, true);
             }
         }
     }
@@ -227,7 +227,7 @@ char *negative_case(float value)
             biased_exponent--;
             if (biased_exponent == 0)
             {
-                return denorm_case();
+                return denorm_case(value, false);
             }
         }
     }
@@ -299,7 +299,7 @@ char *float_to_binary(float value)
 // Function: Swaps the position of significand and the exponenet in the IEEE 754 representation of a floating-point number
 // Input: char* storing the string representation of the 32 bit IEEE 754 floating-point number
 // Output: char* storing the string representation of the 32 bit IEEE 754 floating
-char *switch_significand_exponent(char *value)
+char *switch_significand_exponent_string(char *value)
 {
 
     // Allocating memory for the new string
@@ -321,7 +321,7 @@ char *switch_significand_exponent(char *value)
     }
 
     // Adding the string terminator
-    new_value[32] = '/0';
+    new_value[32] = '\0';
 
     return new_value;
 }
@@ -353,7 +353,7 @@ char *invert_bit_string(char *value)
     }
 
     // Adding the string terminator
-    new_value[32] = '/0';
+    new_value[32] = '\0';
 
     return new_value;
 }
@@ -451,7 +451,7 @@ unsigned int switch_significand_exponent(float value)
     unsigned int significand = get_significand(value);
 
     // Change the position of the significand
-    significand << 8;
+    significand = significand << 8;
 
     // Perform the and operation to get the swapped value
     return (significand & exponent) & sign;
@@ -477,6 +477,26 @@ unsigned int flip_sign(float value)
 // Function: Reduces a given floating point representation from 32 bits to 16 bits
 // Input: unsigned int storing the float representation in 32 bits
 // Output: unsigned short storing the float representation in 16 bits
-unsigned short reduce_F32_to_F16(unsigned int value)
+unsigned short reduce_FP32_to_FP16(unsigned int value)
 {
+    unsigned int sign = get_sign(value);
+    unsigned int exponent = get_exponent(value);
+    unsigned int significand = get_significand(value);
+    
+    // Converting between the biased expoenents
+    exponent = exponent - 127;
+    exponent = exponent + 31;
+    
+    // Reducing the precision of the significand
+    significand = significand >> 13;
+    
+    // Shifting the sign
+    sign = sign >> 16;
+    
+    // Keeping only 5 bits of the exponent
+    exponent = (exponent << 27) >> 17;
+    
+    unsigned short answer= (significand | exponent) | sign;
+    
+    return answer;
 }
